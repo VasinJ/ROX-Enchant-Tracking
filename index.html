@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROX Enchant Tracker - Online Ultimate</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+    <style>
+        body { font-family: 'Kanit', sans-serif; background-color: #F0EFEA; color: #44403C; }
+        .muji-card { background-color: #FFFFFF; border: 1px solid #D6D3D1; border-radius: 1.25rem; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); transition: all 0.3s ease; }
+        .slot-box { border-top: 1px solid #E7E5E4; }
+        .stat-badge { background-color: #FEF3C7; color: #92400E; font-weight: 700; padding: 4px 10px; border-radius: 6px; font-size: 13px; border: 1px solid #FDE68A; }
+        .btn-city-slot { background-color: #57534E; color: #FFF; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer; border: none; }
+        .editable-input { background: transparent; border: none; outline: none; padding: 2px 4px; border-radius: 4px; transition: all 0.2s; }
+        .editable-input:hover { background-color: #F5F5F4; }
+        .editable-input:focus { background-color: #FFF; box-shadow: inset 0 0 0 1px #D6D3D1; }
+        .collapsed .slot-container { display: none; }
+    </style>
+</head>
+<body class="p-4 md:p-10">
+
+    <div id="login-overlay" class="fixed inset-0 z-[100] bg-[#F0EFEA] flex items-center justify-center p-6 hidden">
+        <div class="bg-white p-10 rounded-3xl border border-[#D6D3D1] shadow-2xl max-w-sm w-full text-center">
+            <h2 class="text-2xl font-bold text-[#292524] mb-2">ROX Tracker</h2>
+            <p class="text-sm text-gray-500 mb-8" id="login-desc">กรุณาใส่รหัส 4 หลักเพื่อเข้าใช้งาน</p>
+            <input type="text" id="input-access-id" maxlength="4" placeholder="0000" 
+                class="w-full text-center text-3xl font-bold tracking-[1rem] py-4 border-2 border-gray-200 rounded-2xl mb-6 outline-none focus:border-[#57534E]">
+            <div class="grid gap-3">
+                <button onclick="accessWithId()" class="bg-[#292524] text-white py-4 rounded-xl font-bold hover:bg-black transition shadow-lg" id="btn-login-text">เข้าสู่ระบบ</button>
+                <div class="relative py-2">
+                    <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-200"></div></div>
+                    <span class="relative bg-white px-3 text-xs text-gray-400 font-bold" id="or-text">หรือ</span>
+                </div>
+                <button onclick="createNewId()" class="border-2 border-[#57534E] text-[#57534E] py-3 rounded-xl font-bold hover:bg-[#57534E] hover:text-white transition" id="btn-new-id">สร้างรหัสใหม่</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-content" class="hidden">
+        <div class="max-w-[1400px] mx-auto">
+            <div class="flex justify-between items-center mb-4">
+                <div id="status-area" class="text-[10px] font-bold uppercase tracking-widest text-gray-400">Loading...</div>
+                <div class="inline-flex rounded-lg border border-gray-300 bg-white p-1 shadow-sm">
+                    <button onclick="setLang('th')" id="btn-th" class="px-3 py-1 text-xs font-bold rounded-md">TH</button>
+                    <button onclick="setLang('en')" id="btn-en" class="px-3 py-1 text-xs font-bold rounded-md">EN</button>
+                </div>
+            </div>
+
+            <header class="bg-white p-8 rounded-3xl border border-[#D6D3D1] shadow-md mb-6">
+                <div class="flex items-center gap-2 mb-6 group">
+                    <span class="w-2 h-8 bg-[#57534E] rounded-full"></span>
+                    <input type="text" id="header-title" class="editable-input text-2xl font-bold text-[#292524] w-full" onchange="saveToFirebase()">
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
+                    <div>
+                        <label id="label-type" class="block text-xs font-bold text-[#78716C] uppercase mb-2"></label>
+                        <select id="new-item-type" class="w-full text-sm py-3 border border-gray-300 rounded-lg outline-none px-2 bg-white cursor-pointer"></select>
+                    </div>
+                    <div>
+                        <label id="label-name" class="block text-xs font-bold text-[#78716C] uppercase mb-2"></label>
+                        <input type="text" id="new-item-name" class="w-full text-sm py-2.5 border border-gray-300 rounded-lg outline-none px-3">
+                    </div>
+                    <button onclick="handleAddNewItem()" id="btn-add" class="bg-[#292524] text-white py-3 rounded-xl font-bold hover:bg-black transition shadow-lg active:scale-95"></button>
+                </div>
+            </header>
+
+            <div class="flex justify-end gap-3 mb-6">
+                <button onclick="toggleAll(true)" id="btn-expand" class="text-[10px] font-bold bg-white border border-gray-300 px-4 py-2 rounded-lg"></button>
+                <button onclick="toggleAll(false)" id="btn-collapse" class="text-[10px] font-bold bg-white border border-gray-300 px-4 py-2 rounded-lg"></button>
+            </div>
+
+            <div id="main-container" class="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start pb-20"></div>
+        </div>
+    </div>
+
+    <div id="modal-container" class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/50 hidden backdrop-blur-sm">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-8 shadow-2xl border border-[#D6D3D1]">
+            <h3 id="modal-title" class="text-xl font-bold text-[#292524] mb-3"></h3>
+            <p id="modal-desc" class="text-[#78716C] text-sm mb-8 font-kanit"></p>
+            <div class="flex gap-4">
+                <button id="modal-cancel" class="flex-1 py-3 rounded-xl bg-[#F5F5F4] text-[#78716C] font-bold"></button>
+                <button id="modal-confirm" class="flex-1 py-3 rounded-xl bg-[#FCA5A5] text-[#991B1B] font-bold"></button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = { databaseURL: "https://rox-enchant-default-rtdb.firebaseio.com/" };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let currentLang = 'th';
+        let myEquipment = [];
+        const urlParams = new URLSearchParams(window.location.search);
+        let accessId = urlParams.get('id');
+
+        const PITY_TABLE = { 0:0, 1:4, 2:6, 3:8, 4:8, 5:12, 6:16, 7:20, 8:20, 9:27, 10:33, 11:40, 12:40, 13:50, 14:60, 15:0 };
+        const STAT_CONFIG = {
+            "Prontera": { "Weapon": { stats: ["STR","AGI","VIT","INT","DEX","LUK"], values: { "1H":4, "2H":6, "Dagger":3, "Shield":2 } }, "Armor": { stats: ["STR","AGI","VIT","INT","DEX","LUK"], values: { "Armor":2 } }, "Acc": { stats: ["STR","AGI","VIT","INT","DEX","LUK"], values: { "Acc":2 } } },
+            "Morroc": { "Weapon": { stats: ["P.ATK","M.ATK","P.PEN","M.PEN","Crit DMG Bonus","P.DMG Bonus","M.DMG Bonus","P.DMG Bonus %","M.DMG Bonus %"], values: { "1H":[36,36,36,36,"2.4%",108,108,"2%","2%"], "2H":[54,54,54,54,"3.6%",162,162,"3%","3%"], "Dagger":[27,27,27,27,"1.8%",81,81,"1.5%","1.5%"], "Shield":[18,18,18,18,"1.2%",54,54,"1%","1%"] } }, "Armor": { stats: ["DEF","MDEF","Max HP","Max SP","P.DMG RED","M.DMG RED","P.DMG RED%","M.DMG RED%"], values: { "Armor":[18,18,1080,90,54,54,"1.5%","1.5%"] } }, "Acc": { stats: ["ASPD","Haste","Hit","Crit","Flee","Anti-Crit","Debuff RED","Debuff RES","Debuff PEN","Debuff Enhancement"], values: { "Acc":[18,18,18,18,18,18,0.75,0.75,0.75,0.75] } } },
+            "Alberta": { "Weapon": { stats: ["Final P.DMG Bonus","Final M.DMG Bonus","Neutral DMG","Fire DMG","Water DMG","Wind DMG","Earth DMG","Poison DMG","Holy DMG","Shadow DMG","Ghost DMG","Undead DMG"], values: { "1H":"1.6%", "2H":"2.4%", "Dagger":"1.2%", "Shield":"0.8%" } }, "Armor": { stats: ["Neutral DMG RED","Fire DMG RED","Water DMG RED","Wind DMG RED","Earth DMG RED","Poison DMG RED","Holy DMG RED","Shadow DMG RED","Ghost DMG RED","Undead DMG RED"], values: { "Armor":"1%" } }, "Acc": { stats: ["P.DEF%","M.DEF%","ASPD %","Haste %","Hit %","Dodge %","Crit %","Anti-Crit %","P.PEN %","M.PEN %"], values: { "Acc":"1.6%" } } },
+            "Izlude": { "Weapon": { stats: ["Angel DMG","Demon DMG","Formless DMG","Insect DMG","Fish DMG","Demi-Human DMG","Undead DMG","Dragon DMG","Plant DMG","Brute DMG"], values: { "1H":"2%", "2H":"3%", "Dagger":"1.5%", "Shield":"1%" } }, "Armor": { stats: ["Angel RED","Demon RED","Formless RED","Insect RED","Fish RED","Demi-Human RED","Undead RED","Dragon RED","Plant RED","Brute RED"], values: { "Armor":"1%" } }, "Acc": { stats: ["Large DMG","Medium DMG","Small DMG","Neutral Enhance","Fire Enhance","Water Enhance","Wind Enhance","Earth Enhance","Poison Enhance","Holy Enhance","Shadow Enhance","Ghost Enhance","Undead Enhance"], values: { "Acc":"1%" } } },
+            "Payon": { "Weapon": { stats: ["STR","AGI","VIT","INT","DEX","LUK","P.ATK","M.ATK","P.PEN","M.PEN","Crit DMG Bonus","P.DMG Bonus","M.DMG Bonus"], values: { "1H":[10,10,10,10,10,10,60,60,60,60,"3.6%",240,240], "2H":[15,15,15,15,15,15,90,90,90,90,"5.4%",360,360], "Dagger":[7.5,7.5,7.5,7.5,7.5,7.5,45,45,45,45,"2.7%",180,180], "Shield":[5,5,5,5,5,5,30,30,30,30,"1.8%",120,120] } }, "Armor": { stats: ["STR","AGI","VIT","INT","DEX","LUK","P.DEF","M.DEF","Max HP","Max SP","P.DMG RED","M.DMG RED"], values: { "Armor":[5,5,5,5,5,5,30,30,2400,150,120,120] } }, "Acc": { stats: ["STR","AGI","VIT","INT","DEX","LUK","ASPD","Haste","Hit","Crit","Flee","Anti-Crit"], values: { "Acc":[5,5,5,5,5,5,30,30,30,30,30,30] } } },
+            "Geffen": { "Weapon": { stats: ["P.ATK%","M.ATK%","Final P.PEN%","Final M.PEN%","Final P.DMG Bonus%","Final M.DMG Bonus%","Crit DMG Bonus %","Bonus Heal %","P.Lifesteal %","M.Lifesteal %"], values: { "1H":"2.4%", "2H":"3.6%", "Dagger":"1.8%", "Shield":"1.2%" } }, "Armor": { stats: ["Max HP%","Max SP%","Bonus Heal Rcv %","Final P.DMG RED%","Final M.DMG RED%","Final P.DEF%","Final M.DEF%","Crit DMG RED %","HP Regen","SP Regen"], values: { "Armor":["2.4%","2.4%","1.2%","1.2%","1.2%","1.2%","1.2%","2.4%","0.6%","0.6%"] } }, "Acc": { stats: ["Final ASPD %","Final Haste %","Final Crit %","Crit DMG Bonus %","Final Anti-Crit %","Final Flee %","Final Hit %","P.DMG REF %","M.DMG REF %","Debuff RED","Debuff RES","Debuff PEN","Debuff Enhancement","Final P.PEN %","Final M.PEN %"], values: { "Acc":"1.2%" } } },
+            "Glastheim": { "Weapon": { stats: ["STR%","AGI%","VIT%","INT%","DEX%","LUK%","PVP P.DMG Bonus","PVP M.DMG Bonus","PVP Final P.DMG %","PVP Final M.DMG %","P.DMG Bonus %","M.DMG Bonus %"], values: { "1H":["1.12%",84,"1.4%","4.66%"], "2H":["1.68%",126,"2.1%","6.99%"], "Dagger":["0.84%",63,"1.05%","3.49%"], "Shield":["0.56%",42,"0.7%","2.33%"] } }, "Armor": { stats: ["STR%","AGI","VIT","INT","DEX","LUK","PVP P.DMG RED","PVP M.DMG RED","PVP Final P.RED %","PVP Final M.RED %","P.DMG RED %","M.DMG RED %"], values: { "Armor":["0.56%",42,"0.7%","3.5%"] } }, "Acc": { stats: ["PVP P.DMG RED","PVP M.DMG RED","PVP Final P.RED %","PVP Final M.RED %","PVP Debuff RED","PVP Debuff RES","PVP P.DMG Bonus","PVP M.DMG Bonus","PVP Final P.Bonus %","PVP Final M.Bonus %","PVP Debuff PEN","PVP Debuff Enh"], values: { "Acc":"0.7%" } } },
+            "Comodo": { "Weapon": { stats: ["STR","AGI","INT","DEX","Crit DMG Bonus %","Final P.DMG Bonus %","Final M.DMG Bonus %","Final P.PEN %","Final M.PEN %","PVP P.DMG Bonus","PVP M.DMG Bonus","PVP Final P.Bonus %","PVP Final M.Bonus %"], values: { "1H":[16,"6.4%","3.2%",96,"1.6%"], "2H":[24,"9.6%","4.8%",144,"2.4%"], "Dagger":[12,"4.8%","2.4%",72,"1.2%"], "Shield":[8,"3.2%","1.6%",48,"0.8%"] } }, "Armor": { stats: ["STR","AGI","VIT","INT","DEX","LUK","Final P.DEF %","Final M.DEF %","PVP P.DMG RED","PVP M.DMG RED","PVP Final P.RED %","PVP Final M.RED %"], values: { "Armor":[8,"1.6%",48,"1.2%"] } }, "Acc": { stats: ["Neutral Enhance","Fire Enhance","Water Enhance","Wind Enhance","Earth Enhance","Poison Enhance","Holy Enhance","Shadow Enhance","Ghost Enhance","Undead Enhance","PVP P.DMG RED","PVP M.DMG RED","PVP Final P.RED %","PVP Final M.RED %","PVP P.DMG Bonus","PVP M.DMG Bonus","PVP Final P.Bonus %","PVP Final M.Bonus %"], values: { "Acc":"2%" } } },
+            "Umbala": { "Weapon": { stats: ["Crit DMG Bonus %","Final P.DMG Bonus %","Final M.DMG Bonus %","P.DMG Bonus","M.DMG Bonus","Final P.PEN %","Final M.PEN %"], values: { "1H":["6.4%","3.2%",672,"3.2%"], "2H":["9.6%","4.8%",1008,"4.8%"], "Dagger":["4.8%","2.4%",504,"2.4%"], "Shield":["3.2%","1.6%",336,"1.6%"] } }, "Armor": { stats: ["Final P.DMG RED %","Final M.DMG RED %","Final Anti-Crit %","Final Hit %","P.DMG RED","M.DMG RED","Final P.DEF %","Final M.DEF %","PVP Debuff RED","PVP Debuff RES"], values: { "Armor":["1.6%","1.6%",240,"1.6%",0.8] } }, "Acc": { stats: ["Final Crit %","Final Hit %","Crit DMG Bonus %","Final P.PEN %","Final M.PEN %","Large DMG %","Medium DMG %","Small DMG %","Angel DMG %","Demon DMG %","Formless DMG %","Insect DMG %","Fish DMG %","Demi-Human %","Undead DMG %","Brute DMG %"], values: { "Acc":"1.8%" } } },
+            "Juno": { "Weapon": { stats: ["PVP P.DMG Bonus","PVP M.DMG Bonus","PVP Final P.Bonus %","PVP Final M.Bonus %","P.DMG Bonus %","M.DMG Bonus %","PVP Debuff PEN","PVP Debuff Enh"], values: { "1H":[108,"1.8%","6%",1.8], "2H":[162,"2.7%","9%",2.7], "Dagger":[81,"1.35%","4.5%",1.35], "Shield":[54,"0.9%","3%",0.9] } }, "Armor": { stats: ["Final P.DMG RED %","Final M.DMG RED %","Final Anti-Crit %","Final Hit %","Final P.DEF %","Final M.DEF %","PVP Final P.RED %","PVP Final M.RED %","PVP Debuff RED","PVP Debuff RES"], values: { "Armor":["1.8%","1.8%",0.9] } }, "Acc": { stats: ["Neutral RES %","Fire RES %","Water RES %","Wind RES %","Earth RES %","Poison RES %","Holy RES %","Shadow RES %","Ghost RES %","Undead RES %","PVP Debuff RED","PVP Debuff RES","PVP Debuff PEN","PVP Debuff Enh"], values: { "Acc":"6.75%" } } }
+        };
+
+        const I18N = {
+            th: {
+                header: "เจ้าของ : XXXX", type: "ประเภทอุปกรณ์", name: "ชื่อเรียกไอเทม", add: "+ เพิ่มอุปกรณ์", expand: "กางทั้งหมด", collapse: "พับทั้งหมด",
+                success: "สำเร็จ", fail: "พลาด", noStat: "ไม่มีสเตตัส", confirmDelete: "ลบอุปกรณ์ชิ้นนี้?", confirmReset: "รีเซ็ตช่องนี้เป็นค่าเริ่มต้น?",
+                btnConfirm: "ยืนยัน", btnCancel: "ยกเลิก", loginDesc: "กรุณาใส่รหัส 4 หลักเพื่อเข้าใช้งาน", btnLogin: "เข้าสู่ระบบ", or: "หรือ", btnNew: "สร้างรหัสใหม่",
+                typeLabels: { "1H": "อาวุธหนึ่งมือ (1H Weapon)", "2H": "อาวุธสองมือ (2H Weapon)", "Dagger": "มีดสั้น (Dagger)", "Shield": "โล่ (Shield)", "Armor": "ชุด-ผ้าคลุม-รองเท้า (Armor Set)", "Acc": "เครื่องประดับ (Accessory)" }
+            },
+            en: {
+                header: "Owner : XXXX", type: "Item Type", name: "Item Name", add: "+ Add Item", expand: "Expand All", collapse: "Collapse All",
+                success: "Success", fail: "Fail", noStat: "No Stat", confirmDelete: "Delete this Item?", confirmReset: "Reset this Slot to Default?",
+                btnConfirm: "Confirm", btnCancel: "Cancel", loginDesc: "Enter 4-digit ID to continue", btnLogin: "LOGIN", or: "OR", btnNew: "CREATE NEW ID",
+                typeLabels: { "1H": "One-Handed Weapon", "2H": "Two-Handed Weapon", "Dagger": "Dagger", "Shield": "Shield", "Armor": "Armor Set", "Acc": "Accessory / Talisman" }
+            }
+        };
+
+        // --- ID Handling ---
+        window.onload = () => {
+            if (!accessId) {
+                document.getElementById('login-overlay').classList.remove('hidden');
+            } else {
+                document.getElementById('app-content').classList.remove('hidden');
+                loadFromFirebase();
+            }
+            setLang('th');
+        };
+
+        function accessWithId() {
+            const id = document.getElementById('input-access-id').value;
+            if (id.length === 4) window.location.search = `?id=${id}`;
+            else alert("กรุณาใส่รหัสให้ครบ 4 หลัก");
+        }
+
+        function createNewId() {
+            const rid = Math.floor(1000 + Math.random() * 9000).toString();
+            window.location.search = `?id=${rid}`;
+        }
+
+        // --- Core App Logic ---
+        function setLang(lang) {
+            currentLang = lang; const t = I18N[lang];
+            document.getElementById('label-type').innerText = t.type;
+            document.getElementById('label-name').innerText = t.name;
+            document.getElementById('btn-add').innerText = t.add;
+            document.getElementById('btn-expand').innerText = t.expand;
+            document.getElementById('btn-collapse').innerText = t.collapse;
+            document.getElementById('login-desc').innerText = t.loginDesc;
+            document.getElementById('btn-login-text').innerText = t.btnLogin;
+            document.getElementById('or-text').innerText = t.or;
+            document.getElementById('btn-new-id').innerText = t.btnNew;
+            
+            const head = document.getElementById('header-title');
+            if(!head.value || head.value.includes("เพิ่ม") || head.value.includes("Add")) head.value = t.header;
+
+            const ts = document.getElementById('new-item-type');
+            const pv = ts.value;
+            ts.innerHTML = Object.entries(t.typeLabels).map(([v, l]) => `<option value="${v}" ${v===pv?'selected':''}>${l}</option>`).join('');
+            
+            document.getElementById('btn-th').className = lang === 'th' ? "px-3 py-1 text-xs font-bold rounded-md bg-[#57534E] text-white" : "px-3 py-1 text-xs font-bold rounded-md text-gray-500 hover:bg-gray-100";
+            document.getElementById('btn-en').className = lang === 'en' ? "px-3 py-1 text-xs font-bold rounded-md bg-[#57534E] text-white" : "px-3 py-1 text-xs font-bold rounded-md text-gray-500 hover:bg-gray-100";
+            render();
+        }
+
+        function handleAddNewItem() {
+            const type = document.getElementById('new-item-type').value;
+            const name = document.getElementById('new-item-name').value || (currentLang==='th'?'ไอเทมใหม่':'New Item');
+            const category = ["1H","2H","Dagger","Shield"].includes(type) ? "Weapon" : (type==="Armor"?"Armor":"Acc");
+            myEquipment.unshift({ id:Date.now(), name, type, category, collapsed:false, slots:Array.from({length:type==="Shield"?2:3}, ()=>({level:0, pity:0, totalClicks:0, selectedStat:"", city:"Prontera"})) });
+            document.getElementById('new-item-name').value = '';
+            render(); saveToFirebase();
+        }
+
+        function calculateStatValue(item, slot) {
+            if (!slot.selectedStat) return "-";
+            const cityData = STAT_CONFIG[slot.city][item.category];
+            const idx = cityData.stats.indexOf(slot.selectedStat);
+            let val = Array.isArray(cityData.values[item.type]) ? cityData.values[item.type][idx] : cityData.values[item.type];
+            if(val===undefined) val = Array.isArray(cityData.values[item.type]) ? cityData.values[item.type][0] : cityData.values[item.type];
+            if(typeof val==="string" && val.includes("%")) return (parseFloat(val)*slot.level).toFixed(2)+"%";
+            return (val*slot.level).toLocaleString();
+        }
+
+        function render() {
+            const container = document.getElementById('main-container');
+            const t = I18N[currentLang];
+            container.innerHTML = myEquipment.map(item => {
+                const slotsHtml = item.slots.map((slot, idx) => {
+                    const stats = STAT_CONFIG[slot.city][item.category].stats;
+                    const maxP = PITY_TABLE[slot.level];
+                    return `
+                        <div class="slot-box p-6 bg-white">
+                            <div class="flex flex-wrap items-center gap-6">
+                                <div class="w-24">
+                                    <select onchange="updateSlotCity(${item.id}, ${idx}, this.value)" class="btn-city-slot w-full mb-1">
+                                        ${Object.keys(STAT_CONFIG).map(c => `<option value="${c}" ${slot.city===c?'selected':''}>${c.toUpperCase()}</option>`).join('')}
+                                    </select>
+                                    <select onchange="updateLevel(${item.id}, ${idx}, this.value)" class="w-full font-bold text-lg outline-none cursor-pointer">
+                                        ${Object.keys(PITY_TABLE).map(lv => `<option value="${lv}" ${slot.level==lv?'selected':''}>LV.${lv}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="w-48">
+                                    <select onchange="updateStat(${item.id}, ${idx}, this.value)" class="text-[11px] w-full py-2 bg-white border rounded">
+                                        <option value="">-- ${currentLang==='th'?'เลือก':'Select'} --</option>
+                                        ${stats.map(s => `<option value="${s}" ${slot.selectedStat===s?'selected':''}>${s}</option>`).join('')}
+                                    </select>
+                                </div>
+                                <div class="flex-1 min-w-[220px]">
+                                    <div class="flex justify-between text-xs mb-2 font-bold">
+                                        <span>PITY: ${slot.pity}/${maxP}</span>
+                                        <span>CLICKS: <input type="number" value="${slot.totalClicks}" onchange="updateClick(${item.id}, ${idx}, this.value)" class="w-12 bg-transparent text-right"></span>
+                                    </div>
+                                    <div class="w-full bg-[#F5F5F4] h-3 rounded-full border border-[#D6D3D1] overflow-hidden">
+                                        <div class="bg-[#A8A29E] h-full transition-all" style="width: ${(slot.pity/maxP)*100}%"></div>
+                                    </div>
+                                    <div class="mt-2 text-right"><span class="stat-badge">${slot.selectedStat ? `+${calculateStatValue(item, slot)} ${slot.selectedStat}` : t.noStat}</span></div>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="handleEnchant(${item.id}, ${idx}, true)" class="bg-[#84CC16] text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-md active:scale-95 transition-all">${t.success}</button>
+                                    <button onclick="handleEnchant(${item.id}, ${idx}, false)" class="bg-[#E7E5E4] text-[#292524] px-5 py-2.5 rounded-xl text-sm font-bold active:scale-95 transition-all">${t.fail}</button>
+                                    <button onclick="requestReset(${item.id}, ${idx})" class="border border-[#E7E5E4] p-2.5 rounded-xl hover:bg-red-50 group">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-[#A8A29E] group-hover:text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>`;
+                }).join('');
+
+                return `
+                    <div class="muji-card border-t-[6px] border-[#292524] ${item.collapsed ? 'collapsed' : ''}">
+                        <div class="p-5 bg-[#FAF9F6] flex justify-between items-center cursor-pointer" onclick="toggleItem(${item.id})">
+                            <div class="flex items-center gap-3 flex-1" onclick="event.stopPropagation()">
+                                <span class="transform transition-all ${item.collapsed ? '-rotate-90' : 'rotate-0'} text-gray-400">▼</span>
+                                <div class="flex flex-col">
+                                    <input type="text" value="${item.name}" onchange="updateItemName(${item.id}, this.value)" class="editable-input font-bold text-lg text-[#292524] w-full max-w-[250px]">
+                                    <span class="text-[10px] text-gray-400 font-bold uppercase tracking-widest ml-1">${t.typeLabels[item.type]}</span>
+                                </div>
+                            </div>
+                            <button onclick="event.stopPropagation(); requestRemove(${item.id});" class="text-[#D6D3D1] hover:text-red-500 transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
+                        </div>
+                        <div class="slot-container">${slotsHtml}</div>
+                    </div>`;
+            }).join('');
+        }
+
+        // --- Firebase Integration ---
+        function saveToFirebase() {
+            if (!accessId) return;
+            database.ref('enchant_data/' + accessId).set({
+                title: document.getElementById('header-title').value,
+                items: myEquipment, last_updated: Date.now()
+            });
+        }
+
+        function loadFromFirebase() {
+            database.ref('enchant_data/' + accessId).on('value', (s) => {
+                const d = s.val(); if (d) { myEquipment = d.items || []; document.getElementById('header-title').value = d.title; render(); document.getElementById('status-area').innerText = "LIVE: " + accessId; document.getElementById('status-area').style.color = "green"; }
+                else { document.getElementById('status-area').innerText = "READY: " + accessId; }
+            });
+        }
+
+        // --- Interaction Functions ---
+        function updateSlotCity(id, idx, city) { const i = myEquipment.find(x => x.id === id); i.slots[idx].city = city; i.slots[idx].selectedStat = ""; render(); saveToFirebase(); }
+        function updateStat(id, idx, stat) { myEquipment.find(i => i.id === id).slots[idx].selectedStat = stat; render(); saveToFirebase(); }
+        function updateLevel(id, idx, lv) { const s = myEquipment.find(i => i.id === id).slots[idx]; s.level = parseInt(lv); s.pity = 0; render(); saveToFirebase(); }
+        function updateClick(id, idx, val) { myEquipment.find(i => i.id === id).slots[idx].totalClicks = parseInt(val) || 0; saveToFirebase(); }
+        function handleEnchant(id, idx, succ) {
+            const s = myEquipment.find(i => i.id === id).slots[idx]; s.totalClicks++;
+            if(succ || (s.pity + 1 >= PITY_TABLE[s.level] && PITY_TABLE[s.level] > 0)) { if(s.level < 15) s.level++; s.pity = 0; } else { s.pity++; }
+            render(); saveToFirebase();
+        }
+        function updateItemName(id, n) { myEquipment.find(i => i.id === id).name = n; saveToFirebase(); }
+        function toggleItem(id) { const i = myEquipment.find(x => x.id === id); i.collapsed = !i.collapsed; render(); }
+        function toggleAll(exp) { myEquipment.forEach(i => i.collapsed = !exp); render(); }
+        function requestReset(id, idx) { showModal(I18N[currentLang].confirmReset, "", I18N[currentLang].btnConfirm, () => { const s = myEquipment.find(i => i.id === id).slots[idx]; s.city = "Prontera"; s.level = 0; s.selectedStat = ""; s.pity = 0; s.totalClicks = 0; render(); saveToFirebase(); }); }
+        function requestRemove(id) { showModal(I18N[currentLang].confirmDelete, "", I18N[currentLang].btnConfirm, () => { myEquipment = myEquipment.filter(i => i.id !== id); render(); saveToFirebase(); }); }
+        function showModal(t, d, c, onC) {
+            const m = document.getElementById('modal-container');
+            document.getElementById('modal-title').innerText = t; document.getElementById('modal-desc').innerText = d;
+            const btn = document.getElementById('modal-confirm'); btn.innerText = c;
+            document.getElementById('modal-cancel').innerText = I18N[currentLang].btnCancel;
+            m.classList.remove('hidden'); btn.onclick = () => { onC(); m.classList.add('hidden'); };
+            document.getElementById('modal-cancel').onclick = () => m.classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
